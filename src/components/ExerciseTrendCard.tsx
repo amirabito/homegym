@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ExerciseSeries } from '../lib/exerciseHistory'
 import { TrendChart } from './TrendChart'
-import { VIZ_GOOD } from '../lib/vizColors'
+import { VIZ_GOOD, VIZ_PR } from '../lib/vizColors'
 
 interface Props {
   series: ExerciseSeries
@@ -13,11 +13,13 @@ function formatDate(iso: string): string {
 
 export function ExerciseTrendCard({ series }: Props) {
   const [showTable, setShowTable] = useState(false)
-  const { points, valueLabel, name } = series
+  const { points, valueLabel, name, bestPointIndex } = series
   const latest = points[points.length - 1]
   const first = points[0]
   const delta = latest.value !== null && first.value !== null ? latest.value - first.value : null
-  const prCount = points.filter((p) => p.hitTopOfRange).length
+  const rangeHitCount = points.filter((p) => p.hitTopOfRange).length
+  const bestPoint = bestPointIndex !== null ? points[bestPointIndex] : null
+  const isCurrentPR = bestPointIndex !== null && bestPointIndex === points.length - 1 && points.length > 1
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
@@ -45,15 +47,23 @@ export function ExerciseTrendCard({ series }: Props) {
 
       {points.length > 1 ? (
         <div className="mt-3">
-          <TrendChart points={points} valueLabel={valueLabel} />
+          <TrendChart points={points} valueLabel={valueLabel} bestIndex={bestPointIndex} />
         </div>
       ) : (
         <p className="mt-3 text-xs text-slate-500">Log this exercise again to start seeing a trend.</p>
       )}
 
-      {prCount > 0 && (
-        <p className="mt-2 text-xs text-amber-400">
-          🔥 Hit top of rep range {prCount} time{prCount === 1 ? '' : 's'}
+      {bestPoint && points.length > 1 && (
+        <p className="mt-2 text-xs font-medium" style={{ color: VIZ_PR }}>
+          {isCurrentPR
+            ? `🏆 New PR today — ${bestPoint.value}${valueLabel}`
+            : `🏆 PR: ${bestPoint.value}${valueLabel} (${formatDate(bestPoint.date)})`}
+        </p>
+      )}
+
+      {rangeHitCount > 0 && (
+        <p className="mt-1 text-xs text-amber-400">
+          🔥 Hit top of rep range {rangeHitCount} time{rangeHitCount === 1 ? '' : 's'}
         </p>
       )}
 

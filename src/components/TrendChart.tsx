@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { ExercisePoint } from '../lib/exerciseHistory'
-import { VIZ_GRIDLINE, VIZ_MUTED, VIZ_SERIES } from '../lib/vizColors'
+import { VIZ_GRIDLINE, VIZ_MUTED, VIZ_PR, VIZ_SERIES } from '../lib/vizColors'
 
 interface Props {
   points: ExercisePoint[]
   valueLabel: string
+  /** Index of the all-time best point, if any — gets a distinct marker as the chart's one labeled extreme. */
+  bestIndex?: number | null
 }
 
 const WIDTH = 320
@@ -17,7 +19,7 @@ function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export function TrendChart({ points, valueLabel }: Props) {
+export function TrendChart({ points, valueLabel, bestIndex = null }: Props) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
   const values = points.map((p) => p.value ?? 0)
@@ -52,6 +54,8 @@ export function TrendChart({ points, valueLabel }: Props) {
   const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ')
   const active = activeIndex !== null ? coords[activeIndex] : null
   const last = coords[coords.length - 1]
+  const bestIsLast = bestIndex !== null && bestIndex === coords.length - 1
+  const best = bestIndex !== null && !bestIsLast ? coords[bestIndex] : null
 
   return (
     <div className="relative">
@@ -89,8 +93,8 @@ export function TrendChart({ points, valueLabel }: Props) {
             key={i}
             cx={c.x}
             cy={c.y}
-            r={i === activeIndex || i === coords.length - 1 ? 4 : 3}
-            fill={VIZ_SERIES}
+            r={i === activeIndex || i === coords.length - 1 || i === bestIndex ? 4 : 3}
+            fill={i === bestIndex ? VIZ_PR : VIZ_SERIES}
             stroke="#0f172a"
             strokeWidth={2}
           />
@@ -116,13 +120,29 @@ export function TrendChart({ points, valueLabel }: Props) {
           y={last.y - 12}
           textAnchor="end"
           fontSize="11"
-          fill={VIZ_MUTED}
+          fill={bestIsLast ? VIZ_PR : VIZ_MUTED}
           stroke="#0f172a"
           strokeWidth={3}
           paintOrder="stroke"
         >
+          {bestIsLast ? '🏆 ' : ''}
           {last.point.value ?? '–'} {valueLabel}
         </text>
+
+        {best && (
+          <text
+            x={best.x}
+            y={best.y - 10}
+            textAnchor="middle"
+            fontSize="11"
+            fill={VIZ_PR}
+            stroke="#0f172a"
+            strokeWidth={3}
+            paintOrder="stroke"
+          >
+            🏆
+          </text>
+        )}
       </svg>
 
       {active && (

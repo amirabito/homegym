@@ -14,6 +14,8 @@ export interface ExerciseSeries {
   unit: ExerciseUnit
   valueLabel: string
   points: ExercisePoint[]
+  /** Index into `points` of the first session that reached the all-time best value, or null if nothing logged yet. */
+  bestPointIndex: number | null
 }
 
 /** Best single-set value logged for an exercise: top weight for weighted lifts, longest hold for timed ones. */
@@ -43,7 +45,13 @@ export function buildExerciseSeries(sessions: WorkoutSession[], weightUnit: stri
 
       let series = byName.get(log.exerciseName)
       if (!series) {
-        series = { name: log.exerciseName, unit: log.unit, valueLabel: log.unit === 'seconds' ? 'sec' : weightUnit, points: [] }
+        series = {
+          name: log.exerciseName,
+          unit: log.unit,
+          valueLabel: log.unit === 'seconds' ? 'sec' : weightUnit,
+          points: [],
+          bestPointIndex: null,
+        }
         byName.set(log.exerciseName, series)
       }
 
@@ -58,6 +66,18 @@ export function buildExerciseSeries(sessions: WorkoutSession[], weightUnit: stri
           .join(', '),
       })
     }
+  }
+
+  for (const series of byName.values()) {
+    let bestIndex: number | null = null
+    let bestValue = -Infinity
+    series.points.forEach((p, i) => {
+      if (p.value !== null && p.value > bestValue) {
+        bestValue = p.value
+        bestIndex = i
+      }
+    })
+    series.bestPointIndex = bestIndex
   }
 
   return [...byName.values()]

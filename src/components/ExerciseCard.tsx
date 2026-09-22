@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ExerciseLog, ExerciseTarget, Settings, WorkoutSession } from '../types'
 import { findLastExerciseEntry, hitTopOfRange, suggestWeightForToday, suggestedNextWeight, topWeight } from '../lib/progress'
 
@@ -22,6 +23,25 @@ function formatShortDate(iso: string): string {
 }
 
 export function ExerciseCard({ target, log, onChange, onSetCompleted, sessions, currentSessionId, settings }: Props) {
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [draftName, setDraftName] = useState(log.exerciseName)
+  const wasSwapped = log.exerciseName !== target.name
+
+  function startEditingName() {
+    setDraftName(log.exerciseName)
+    setIsEditingName(true)
+  }
+
+  function commitName() {
+    const trimmed = draftName.trim()
+    onChange({ ...log, exerciseName: trimmed || target.name })
+    setIsEditingName(false)
+  }
+
+  function resetName() {
+    onChange({ ...log, exerciseName: target.name })
+  }
+
   const lastEntry = findLastExerciseEntry(sessions, target.id, currentSessionId)
   const lastLog = lastEntry?.log ?? null
   const isSecondsUnit = target.unit === 'seconds'
@@ -57,18 +77,55 @@ export function ExerciseCard({ target, log, onChange, onSetCompleted, sessions, 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-semibold text-white">{target.name}</h3>
+        <div className="min-w-0 flex-1">
+          {isEditingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                aria-label="Exercise name"
+                value={draftName}
+                autoFocus
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitName()
+                  if (e.key === 'Escape') setIsEditingName(false)
+                }}
+                onBlur={commitName}
+                className="w-full rounded-lg border border-brand-500 bg-slate-950 px-2 py-1 text-sm font-semibold text-white"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={startEditingName}
+              className="group flex items-center gap-1.5 text-left"
+              aria-label={`Edit exercise name, currently ${log.exerciseName}`}
+            >
+              <h3 className="font-semibold text-white">{log.exerciseName}</h3>
+              <span className="text-slate-600 group-active:text-slate-400">✎</span>
+            </button>
+          )}
           <p className="text-xs text-slate-400">
             {rangeLabel(target)} &middot; rest {target.restSeconds}s
           </p>
+          {wasSwapped && !isEditingName && (
+            <p className="mt-0.5 text-xs text-slate-500">
+              Swapped in for {target.name} ·{' '}
+              <button type="button" onClick={resetName} className="text-brand-400 underline-offset-2 hover:underline">
+                reset
+              </button>
+            </p>
+          )}
         </div>
       </div>
 
       {lastEntry && (
         <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2">
           <p className="text-xs text-slate-400">
-            Last time ({formatShortDate(lastEntry.date)}): <span className="text-slate-300">{lastSummary}</span>
+            {lastEntry.log.exerciseName !== log.exerciseName
+              ? `Last time you did ${lastEntry.log.exerciseName} here (${formatShortDate(lastEntry.date)}):`
+              : `Last time (${formatShortDate(lastEntry.date)}):`}{' '}
+            <span className="text-slate-300">{lastSummary}</span>
             {hitTopOfRange(lastEntry.log) && <span className="text-amber-400"> 🔥</span>}
           </p>
           {suggestion && (

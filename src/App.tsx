@@ -29,6 +29,10 @@ export default function App() {
     setSessions((prev) => prev.filter((s) => s.id !== sessionId))
   }
 
+  function handleUpdateSession(updated: WorkoutSession) {
+    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+  }
+
   return (
     <RestTimerProvider>
       {view.name === 'home' && (
@@ -61,6 +65,7 @@ export default function App() {
           settings={settings}
           onBack={() => setView({ name: 'home' })}
           onDelete={handleDeleteSession}
+          onUpdate={handleUpdateSession}
         />
       )}
 

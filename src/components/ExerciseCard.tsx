@@ -1,5 +1,5 @@
 import type { ExerciseLog, ExerciseTarget, Settings, WorkoutSession } from '../types'
-import { findLastExerciseLog, hitTopOfRange, suggestedNextWeight, topWeight } from '../lib/progress'
+import { findLastExerciseEntry, hitTopOfRange, suggestWeightForToday, suggestedNextWeight, topWeight } from '../lib/progress'
 
 interface Props {
   target: ExerciseTarget
@@ -17,16 +17,21 @@ function rangeLabel(target: ExerciseTarget): string {
   return `${target.sets} x ${target.repsMin}-${target.repsMax} ${unit}${perSide}`
 }
 
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 export function ExerciseCard({ target, log, onChange, onSetCompleted, sessions, currentSessionId, settings }: Props) {
-  const lastLog = findLastExerciseLog(sessions, target.id, currentSessionId)
+  const lastEntry = findLastExerciseEntry(sessions, target.id, currentSessionId)
+  const lastLog = lastEntry?.log ?? null
+  const isSecondsUnit = target.unit === 'seconds'
   const lastSummary = lastLog
     ? lastLog.sets
         .filter((s) => s.completed)
-        .map((s) => `${s.weight ?? '-'}${settings.weightUnit}×${s.reps ?? '-'}`)
+        .map((s) => (isSecondsUnit ? `${s.reps}s` : `${s.weight ?? '-'}${settings.weightUnit}×${s.reps ?? '-'}`))
         .join(', ')
     : null
-
-  const isSecondsUnit = target.unit === 'seconds'
+  const suggestion = !isSecondsUnit ? suggestWeightForToday(lastLog, settings.weightIncrement) : null
   const allDone = log.sets.every((s) => s.completed)
   const recommendIncrease = allDone && hitTopOfRange(log)
   const nextWeight = recommendIncrease ? suggestedNextWeight(topWeight(log), settings.weightIncrement) : null
@@ -60,7 +65,21 @@ export function ExerciseCard({ target, log, onChange, onSetCompleted, sessions, 
         </div>
       </div>
 
-      {lastSummary && <p className="mt-2 text-xs text-slate-500">Last time: {lastSummary}</p>}
+      {lastEntry && (
+        <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2">
+          <p className="text-xs text-slate-400">
+            Last time ({formatShortDate(lastEntry.date)}): <span className="text-slate-300">{lastSummary}</span>
+            {hitTopOfRange(lastEntry.log) && <span className="text-amber-400"> 🔥</span>}
+          </p>
+          {suggestion && (
+            <p className="mt-1 text-xs font-medium text-brand-400">
+              {suggestion.isIncrease
+                ? `Try ${suggestion.weight}${settings.weightUnit} today — you hit the top of the range on every set.`
+                : `Try ${suggestion.weight}${settings.weightUnit} again — aim for ${target.repsMax} reps on every set.`}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 space-y-2">
         {log.sets.map((set, i) => (

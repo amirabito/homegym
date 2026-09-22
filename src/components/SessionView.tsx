@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { WorkoutDay, WorkoutSession, ExerciseLog, ExerciseTarget, Settings } from '../types'
 import { ExerciseCard } from './ExerciseCard'
 import { useRestTimer } from '../lib/RestTimerContext'
+import { findLastExerciseLog, suggestWeightForToday } from '../lib/progress'
 
 interface Props {
   day: WorkoutDay
@@ -11,7 +12,7 @@ interface Props {
   onCancel: () => void
 }
 
-function buildInitialSession(day: WorkoutDay): WorkoutSession {
+function buildInitialSession(day: WorkoutDay, sessions: WorkoutSession[], weightIncrement: number): WorkoutSession {
   return {
     id: crypto.randomUUID(),
     dayId: day.id,
@@ -19,20 +20,27 @@ function buildInitialSession(day: WorkoutDay): WorkoutSession {
     startedAt: new Date().toISOString(),
     finishedAt: null,
     notes: '',
-    exercises: day.exercises.map(
-      (ex): ExerciseLog => ({
+    exercises: day.exercises.map((ex): ExerciseLog => {
+      // Pre-fill today's weight from last time's performance so there's less to type at the gym.
+      const lastLog = ex.unit === 'reps' ? findLastExerciseLog(sessions, ex.id) : null
+      const suggestion = suggestWeightForToday(lastLog, weightIncrement)
+      return {
         exerciseId: ex.id,
         exerciseName: ex.name,
         unit: ex.unit,
         repsMax: ex.repsMax,
-        sets: Array.from({ length: ex.sets }, () => ({ weight: null, reps: null, completed: false })),
-      }),
-    ),
+        sets: Array.from({ length: ex.sets }, () => ({
+          weight: suggestion?.weight ?? null,
+          reps: null,
+          completed: false,
+        })),
+      }
+    }),
   }
 }
 
 export function SessionView({ day, sessions, settings, onFinish, onCancel }: Props) {
-  const [session, setSession] = useState<WorkoutSession>(() => buildInitialSession(day))
+  const [session, setSession] = useState<WorkoutSession>(() => buildInitialSession(day, sessions, settings.weightIncrement))
   const { start } = useRestTimer()
 
   const totalSets = session.exercises.reduce((sum, e) => sum + e.sets.length, 0)

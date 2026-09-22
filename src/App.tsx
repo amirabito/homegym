@@ -4,11 +4,12 @@ import { RestTimerBar } from './components/RestTimerBar'
 import { Home } from './components/Home'
 import { SessionView } from './components/SessionView'
 import { History } from './components/History'
+import { ProgressView } from './components/ProgressView'
 import { getDay } from './data/workouts'
 import { loadSessions, saveSessions, loadSettings } from './lib/storage'
 import type { WorkoutSession } from './types'
 
-type View = { name: 'home' } | { name: 'session'; dayId: string } | { name: 'history' }
+type View = { name: 'home' } | { name: 'session'; dayId: string } | { name: 'history' } | { name: 'progress' }
 
 export default function App() {
   const [sessions, setSessions] = useState<WorkoutSession[]>(() => loadSessions())
@@ -35,6 +36,7 @@ export default function App() {
           sessions={sessions}
           onStartDay={(dayId) => setView({ name: 'session', dayId })}
           onViewHistory={() => setView({ name: 'history' })}
+          onViewProgress={() => setView({ name: 'progress' })}
         />
       )}
 
@@ -60,6 +62,10 @@ export default function App() {
           onBack={() => setView({ name: 'home' })}
           onDelete={handleDeleteSession}
         />
+      )}
+
+      {view.name === 'progress' && (
+        <ProgressView sessions={sessions} settings={settings} onBack={() => setView({ name: 'home' })} />
       )}
 
       <RestTimerBar />

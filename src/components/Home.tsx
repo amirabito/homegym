@@ -7,6 +7,7 @@ interface Props {
   onStartDay: (dayId: string) => void
   onViewHistory: () => void
   onViewProgress: () => void
+  onViewSettings: () => void
 }
 
 const QUICK_TIMER_PRESETS = [30, 45, 60, 90, 120]
@@ -19,7 +20,7 @@ function timeAgo(iso: string): string {
   return `${days} days ago`
 }
 
-export function Home({ sessions, onStartDay, onViewHistory, onViewProgress }: Props) {
+export function Home({ sessions, onStartDay, onViewHistory, onViewProgress, onViewSettings }: Props) {
   const { start } = useRestTimer()
   const finished = sessions.filter((s) => s.finishedAt)
   const lastByDay = new Map<string, WorkoutSession>()
@@ -30,8 +31,20 @@ export function Home({ sessions, onStartDay, onViewHistory, onViewProgress }: Pr
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-16 pt-8">
-      <h1 className="text-2xl font-bold text-white">HomeGym</h1>
-      <p className="text-sm text-slate-400">3-day muscle gain split</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">HomeGym</h1>
+          <p className="text-sm text-slate-400">3-day muscle gain split</p>
+        </div>
+        <button
+          type="button"
+          onClick={onViewSettings}
+          aria-label="Settings"
+          className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-400 active:bg-slate-800"
+        >
+          ⚙
+        </button>
+      </div>
 
       <div className="mt-6 space-y-3">
         {WORKOUT_DAYS.map((day) => {

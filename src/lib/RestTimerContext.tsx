@@ -16,6 +16,26 @@ interface RestTimerState {
 
 const RestTimerContext = createContext<RestTimerState | null>(null)
 
+function requestNotificationPermissionIfNeeded() {
+  if (typeof Notification === 'undefined') return
+  if (Notification.permission === 'default') {
+    // Fire-and-forget; must be called from a user-gesture call stack (start() is only ever
+    // invoked from click handlers), which is what lets browsers grant this without a prompt-abuse block.
+    void Notification.requestPermission()
+  }
+}
+
+function notifyIfHidden(label: string) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  if (typeof document !== 'undefined' && !document.hidden) return
+  try {
+    new Notification('Rest complete', { body: `${label} — back to it!`, tag: 'homegym-rest-timer' })
+  } catch {
+    // Some browsers (notably iOS Safari outside an installed PWA) don't support the
+    // Notification constructor at all — the in-app beep/vibration is the fallback there.
+  }
+}
+
 export function RestTimerProvider({ children }: { children: ReactNode }) {
   const [totalSeconds, setTotalSeconds] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(0)
@@ -23,6 +43,10 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const [label, setLabel] = useState('')
   const intervalRef = useRef<number | null>(null)
   const hasFiredRef = useRef(false)
+  // Absolute completion time, not a countdown to decrement — this way a throttled/suspended
+  // background tab still reports the correct remaining time the moment it ticks again,
+  // instead of drifting behind by however long it was backgrounded.
+  const endAtRef = useRef<number | null>(null)
 
   const clear = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -33,64 +57,94 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => clear, [clear])
 
+  const fireCompletion = useCallback(() => {
+    if (hasFiredRef.current) return
+    hasFiredRef.current = true
+    playBeep()
+    notifyIfHidden(label)
+  }, [label])
+
+  const recomputeFromEndAt = useCallback(() => {
+    if (endAtRef.current === null) return
+    const remaining = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000))
+    setSecondsLeft(remaining)
+    if (remaining === 0) {
+      setIsRunning(false)
+      clear()
+      fireCompletion()
+    }
+  }, [clear, fireCompletion])
+
   const start = useCallback(
     (seconds: number, newLabel = 'Rest') => {
       clear()
       hasFiredRef.current = false
+      endAtRef.current = Date.now() + seconds * 1000
       setTotalSeconds(seconds)
       setSecondsLeft(seconds)
       setLabel(newLabel)
       setIsRunning(true)
+      requestNotificationPermissionIfNeeded()
     },
     [clear],
   )
 
   const skip = useCallback(() => {
     clear()
+    endAtRef.current = null
     setIsRunning(false)
     setSecondsLeft(0)
   }, [clear])
 
   const dismiss = useCallback(() => {
     clear()
+    endAtRef.current = null
     setIsRunning(false)
     setSecondsLeft(0)
     setTotalSeconds(0)
   }, [clear])
 
-  const pause = useCallback(() => setIsRunning(false), [])
+  const pause = useCallback(() => {
+    clear()
+    endAtRef.current = null
+    setIsRunning(false)
+  }, [clear])
+
   const resume = useCallback(() => {
-    if (secondsLeft > 0) setIsRunning(true)
-  }, [secondsLeft])
+    setSecondsLeft((s) => {
+      if (s > 0) {
+        endAtRef.current = Date.now() + s * 1000
+        setIsRunning(true)
+      }
+      return s
+    })
+  }, [])
 
   const addTime = useCallback((delta: number) => {
+    if (endAtRef.current !== null) endAtRef.current += delta * 1000
     setSecondsLeft((s) => Math.max(0, s + delta))
     setTotalSeconds((t) => Math.max(t, t + Math.max(0, delta)))
   }, [])
 
   useEffect(() => {
     if (!isRunning) return
-    intervalRef.current = window.setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
+    intervalRef.current = window.setInterval(recomputeFromEndAt, 1000)
     return clear
-  }, [isRunning, clear])
+  }, [isRunning, clear, recomputeFromEndAt])
 
+  // Catch up immediately when the tab regains focus/visibility, since background intervals
+  // are throttled (or fully suspended) by the browser and may not have ticked in a while.
   useEffect(() => {
-    if (secondsLeft === 0 && isRunning) {
-      setIsRunning(false)
-      clear()
-      if (!hasFiredRef.current) {
-        hasFiredRef.current = true
-        playBeep()
-      }
+    function onVisible() {
+      if (document.visibilityState === 'visible' && isRunning) recomputeFromEndAt()
     }
-  }, [secondsLeft, isRunning, clear])
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [isRunning, recomputeFromEndAt])
 
   return (
     <RestTimerContext.Provider

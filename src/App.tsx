@@ -5,20 +5,30 @@ import { Home } from './components/Home'
 import { SessionView } from './components/SessionView'
 import { History } from './components/History'
 import { ProgressView } from './components/ProgressView'
+import { SettingsView } from './components/SettingsView'
 import { getDay } from './data/workouts'
-import { loadSessions, saveSessions, loadSettings } from './lib/storage'
-import type { WorkoutSession } from './types'
+import { loadSessions, saveSessions, loadSettings, saveSettings } from './lib/storage'
+import type { Settings, WorkoutSession } from './types'
 
-type View = { name: 'home' } | { name: 'session'; dayId: string } | { name: 'history' } | { name: 'progress' }
+type View =
+  | { name: 'home' }
+  | { name: 'session'; dayId: string }
+  | { name: 'history' }
+  | { name: 'progress' }
+  | { name: 'settings' }
 
 export default function App() {
   const [sessions, setSessions] = useState<WorkoutSession[]>(() => loadSessions())
-  const [settings] = useState(() => loadSettings())
+  const [settings, setSettings] = useState<Settings>(() => loadSettings())
   const [view, setView] = useState<View>({ name: 'home' })
 
   useEffect(() => {
     saveSessions(sessions)
   }, [sessions])
+
+  useEffect(() => {
+    saveSettings(settings)
+  }, [settings])
 
   function handleFinishSession(session: WorkoutSession) {
     setSessions((prev) => [...prev, session])
@@ -33,6 +43,11 @@ export default function App() {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
   }
 
+  function handleRestoreBackup(restoredSessions: WorkoutSession[], restoredSettings: Settings) {
+    setSessions(restoredSessions)
+    setSettings(restoredSettings)
+  }
+
   return (
     <RestTimerProvider>
       {view.name === 'home' && (
@@ -41,6 +56,7 @@ export default function App() {
           onStartDay={(dayId) => setView({ name: 'session', dayId })}
           onViewHistory={() => setView({ name: 'history' })}
           onViewProgress={() => setView({ name: 'progress' })}
+          onViewSettings={() => setView({ name: 'settings' })}
         />
       )}
 
@@ -71,6 +87,16 @@ export default function App() {
 
       {view.name === 'progress' && (
         <ProgressView sessions={sessions} settings={settings} onBack={() => setView({ name: 'home' })} />
+      )}
+
+      {view.name === 'settings' && (
+        <SettingsView
+          sessions={sessions}
+          settings={settings}
+          onBack={() => setView({ name: 'home' })}
+          onUpdateSettings={setSettings}
+          onRestoreBackup={handleRestoreBackup}
+        />
       )}
 
       <RestTimerBar />

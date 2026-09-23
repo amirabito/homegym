@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { playBeep } from './beep'
-import { speak } from './speech'
+import { keepSpeechAlive, speak } from './speech'
 
 interface RestTimerState {
   secondsLeft: number
@@ -95,6 +95,9 @@ export function RestTimerProvider({ children, voiceCountdownEnabled = true }: Pr
     if (endAtRef.current === null) return
     const remaining = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000))
     setSecondsLeft(remaining)
+    // Keep the speech queue from going idle during long silent gaps (e.g. the ~50s
+    // between a "30 seconds" warning and the final countdown) before it needs to speak again.
+    if (voiceEnabledRef.current) keepSpeechAlive()
     maybeAnnounce(remaining)
     if (remaining === 0) {
       setIsRunning(false)

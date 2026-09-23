@@ -8,6 +8,7 @@ import { ProgressView } from './components/ProgressView'
 import { SettingsView } from './components/SettingsView'
 import { getDay } from './data/workouts'
 import { loadSessions, saveSessions, loadSettings, saveSettings } from './lib/storage'
+import { primeSpeechOnFirstGesture } from './lib/speech'
 import type { Settings, WorkoutSession } from './types'
 
 type View =
@@ -29,6 +30,10 @@ export default function App() {
   useEffect(() => {
     saveSettings(settings)
   }, [settings])
+
+  useEffect(() => {
+    primeSpeechOnFirstGesture()
+  }, [])
 
   function handleFinishSession(session: WorkoutSession) {
     setSessions((prev) => [...prev, session])

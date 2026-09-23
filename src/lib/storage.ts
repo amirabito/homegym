@@ -6,6 +6,7 @@ const SETTINGS_KEY = 'homegym.settings.v1'
 export const DEFAULT_SETTINGS: Settings = {
   weightUnit: 'lb',
   weightIncrement: 5,
+  voiceCountdown: true,
 }
 
 function safeParse<T>(raw: string | null, fallback: T): T {

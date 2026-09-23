@@ -85,6 +85,36 @@ export function SettingsView({ sessions, settings, onBack, onUpdateSettings, onR
       </div>
 
       <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900 p-4">
+        <h2 className="text-sm font-semibold text-white">Rest timer</h2>
+        <div className="mt-3 flex items-center justify-between">
+          <div>
+            <span className="text-sm text-slate-300">Voice countdown</span>
+            <p className="text-xs text-slate-500">Says "30 seconds", then counts down out loud from 10</p>
+          </div>
+          <div className="flex overflow-hidden rounded-lg border border-slate-700">
+            {([true, false] as const).map((value) => (
+              <button
+                key={String(value)}
+                type="button"
+                onClick={() => onUpdateSettings({ ...settings, voiceCountdown: value })}
+                className={`px-4 py-1.5 text-sm font-medium ${
+                  settings.voiceCountdown === value ? 'bg-brand-600 text-white' : 'bg-slate-950 text-slate-400'
+                }`}
+              >
+                {value ? 'On' : 'Off'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          On Android and desktop, HomeGym can also show a notification when a rest period finishes even if you've
+          switched apps or the screen has locked (allow notifications when prompted). iPhone Safari doesn't support
+          that outside an installed app — the voice countdown and in-app sound/vibration above still work there,
+          which is why they're on by default.
+        </p>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900 p-4">
         <h2 className="text-sm font-semibold text-white">Backup &amp; restore</h2>
         <p className="mt-1 text-xs text-slate-500">
           Your data only lives in this browser. Export it to keep a copy, or move it to another device.
@@ -110,13 +140,6 @@ export function SettingsView({ sessions, settings, onBack, onUpdateSettings, onR
         {importError && <p className="mt-2 text-xs text-red-400">{importError}</p>}
         {importSuccess && <p className="mt-2 text-xs text-emerald-400">{importSuccess}</p>}
       </div>
-
-      <p className="mt-4 text-xs text-slate-600">
-        Rest timer alerts: on Android and desktop, HomeGym can show a notification when a rest period finishes even if
-        you've switched apps or the screen has locked (allow notifications when prompted). iPhone Safari doesn't support
-        this outside an installed app, so the in-app sound/vibration is the fallback there — keep the tab open and your
-        phone unlocked for the most reliable alert.
-      </p>
     </div>
   )
 }

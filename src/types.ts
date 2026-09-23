@@ -48,4 +48,5 @@ export interface WorkoutSession {
 export interface Settings {
   weightUnit: 'lb' | 'kg'
   weightIncrement: number
+  voiceCountdown: boolean
 }

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { playBeep } from './beep'
+import { speak } from './speech'
 
 interface RestTimerState {
   secondsLeft: number
@@ -36,7 +37,13 @@ function notifyIfHidden(label: string) {
   }
 }
 
-export function RestTimerProvider({ children }: { children: ReactNode }) {
+interface ProviderProps {
+  children: ReactNode
+  /** Whether to speak a 30s warning and count down 10→1 aloud. Defaults to on. */
+  voiceCountdownEnabled?: boolean
+}
+
+export function RestTimerProvider({ children, voiceCountdownEnabled = true }: ProviderProps) {
   const [totalSeconds, setTotalSeconds] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
@@ -47,6 +54,14 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   // background tab still reports the correct remaining time the moment it ticks again,
   // instead of drifting behind by however long it was backgrounded.
   const endAtRef = useRef<number | null>(null)
+  // Which countdown values have already been spoken this run, so a re-render or a
+  // catch-up recompute never repeats (or retroactively speaks skipped-over) a number.
+  const spokenRef = useRef<Set<number>>(new Set())
+  const voiceEnabledRef = useRef(voiceCountdownEnabled)
+
+  useEffect(() => {
+    voiceEnabledRef.current = voiceCountdownEnabled
+  }, [voiceCountdownEnabled])
 
   const clear = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -56,6 +71,18 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => clear, [clear])
+
+  const maybeAnnounce = useCallback((remaining: number) => {
+    if (!voiceEnabledRef.current) return
+    if (spokenRef.current.has(remaining)) return
+    if (remaining === 30) {
+      spokenRef.current.add(remaining)
+      speak('30 seconds')
+    } else if (remaining >= 1 && remaining <= 10) {
+      spokenRef.current.add(remaining)
+      speak(String(remaining))
+    }
+  }, [])
 
   const fireCompletion = useCallback(() => {
     if (hasFiredRef.current) return
@@ -68,25 +95,28 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     if (endAtRef.current === null) return
     const remaining = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000))
     setSecondsLeft(remaining)
+    maybeAnnounce(remaining)
     if (remaining === 0) {
       setIsRunning(false)
       clear()
       fireCompletion()
     }
-  }, [clear, fireCompletion])
+  }, [clear, fireCompletion, maybeAnnounce])
 
   const start = useCallback(
     (seconds: number, newLabel = 'Rest') => {
       clear()
       hasFiredRef.current = false
+      spokenRef.current = new Set()
       endAtRef.current = Date.now() + seconds * 1000
       setTotalSeconds(seconds)
       setSecondsLeft(seconds)
       setLabel(newLabel)
       setIsRunning(true)
       requestNotificationPermissionIfNeeded()
+      maybeAnnounce(seconds)
     },
-    [clear],
+    [clear, maybeAnnounce],
   )
 
   const skip = useCallback(() => {
@@ -120,11 +150,18 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const addTime = useCallback((delta: number) => {
-    if (endAtRef.current !== null) endAtRef.current += delta * 1000
-    setSecondsLeft((s) => Math.max(0, s + delta))
-    setTotalSeconds((t) => Math.max(t, t + Math.max(0, delta)))
-  }, [])
+  const addTime = useCallback(
+    (delta: number) => {
+      if (endAtRef.current !== null) endAtRef.current += delta * 1000
+      setSecondsLeft((s) => {
+        const next = Math.max(0, s + delta)
+        maybeAnnounce(next)
+        return next
+      })
+      setTotalSeconds((t) => Math.max(t, t + Math.max(0, delta)))
+    },
+    [maybeAnnounce],
+  )
 
   useEffect(() => {
     if (!isRunning) return

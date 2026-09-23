@@ -49,7 +49,7 @@ export default function App() {
   }
 
   return (
-    <RestTimerProvider>
+    <RestTimerProvider voiceCountdownEnabled={settings.voiceCountdown}>
       {view.name === 'home' && (
         <Home
           sessions={sessions}

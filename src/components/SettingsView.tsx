@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { Settings, WorkoutSession } from '../types'
 import { exportBackup, parseBackupFile } from '../lib/backup'
+import { tryUnlockSilentSwitch } from '../lib/speech'
 
 interface Props {
   sessions: WorkoutSession[]
@@ -32,6 +33,7 @@ export function SettingsView({ sessions, settings, onBack, onUpdateSettings, onR
       return
     }
     setVoiceStatus('Requested…')
+    tryUnlockSilentSwitch()
     try {
       window.speechSynthesis.cancel()
       const utterance = new SpeechSynthesisUtterance('Testing, 1, 2, 3')
@@ -152,6 +154,11 @@ export function SettingsView({ sessions, settings, onBack, onUpdateSettings, onR
           switched apps or the screen has locked (allow notifications when prompted). iPhone Safari doesn't support
           that outside an installed app — the voice countdown and in-app sound/vibration above still work there,
           which is why they're on by default.
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          HomeGym also makes a best-effort, unofficial attempt to keep the voice countdown audible even with an
+          iPhone's silent switch on. It isn't guaranteed by Apple and may not work on every iOS version — with the
+          ringer on, everything above works reliably regardless.
         </p>
       </div>
 

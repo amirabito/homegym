@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { Settings, WorkoutSession } from '../types'
 import { exportBackup, parseBackupFile } from '../lib/backup'
 
@@ -14,6 +14,35 @@ export function SettingsView({ sessions, settings, onBack, onUpdateSettings, onR
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
+  const [voiceCount, setVoiceCount] = useState(0)
+  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
+
+  useEffect(() => {
+    if (!speechSupported) return
+    const update = () => setVoiceCount(window.speechSynthesis.getVoices().length)
+    update()
+    window.speechSynthesis.addEventListener('voiceschanged', update)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', update)
+  }, [speechSupported])
+
+  function testVoice() {
+    if (!speechSupported) {
+      setVoiceStatus('This browser has no speech synthesis support at all.')
+      return
+    }
+    setVoiceStatus('Requested…')
+    try {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance('Testing, 1, 2, 3')
+      utterance.onstart = () => setVoiceStatus('Speaking now — do you hear it?')
+      utterance.onend = () => setVoiceStatus('Finished — the browser reported success.')
+      utterance.onerror = (e) => setVoiceStatus(`Browser reported an error: "${e.error}"`)
+      window.speechSynthesis.speak(utterance)
+    } catch (err) {
+      setVoiceStatus(`Threw an exception: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
 
   function handleFileChosen(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -106,6 +135,18 @@ export function SettingsView({ sessions, settings, onBack, onUpdateSettings, onR
             ))}
           </div>
         </div>
+        <button
+          type="button"
+          onClick={testVoice}
+          className="mt-3 w-full rounded-lg border border-slate-700 py-2.5 text-sm font-medium text-slate-200 active:bg-slate-800"
+        >
+          Test voice
+        </button>
+        {voiceStatus && <p className="mt-2 text-xs text-brand-400">{voiceStatus}</p>}
+        <p className="mt-2 text-xs text-slate-600">
+          Support: {speechSupported ? 'available' : 'not available'} &middot; Voices loaded: {voiceCount}
+        </p>
+
         <p className="mt-3 text-xs text-slate-500">
           On Android and desktop, HomeGym can also show a notification when a rest period finishes even if you've
           switched apps or the screen has locked (allow notifications when prompted). iPhone Safari doesn't support
